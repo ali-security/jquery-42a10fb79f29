@@ -1,3 +1,53 @@
 language: node_js
+dist: focal
 node_js:
-- '0.10'
+  - '0.10'
+jobs:
+  include:
+    - name: QUnit suite (headless Chrome) + grunt build/lint on node 0.10
+      node_js: '20'
+      addons:
+        chrome: stable
+      before_install:
+        - >-
+          if ! command -v php > /dev/null 2>&1; then
+          sudo apt-get update && sudo apt-get install -y php-cli;
+          fi
+      install:
+        - nvm install 0.10
+        - nvm use 0.10
+        - node --version
+        - npm --version
+        - npm install
+        # = `npm test`: the project's default grunt task (jsonlint, build,
+        # jshint, jscs, uglify, dist, compare_size)
+        - ./node_modules/.bin/grunt
+        - nvm use 20
+        # Browser driver in its own tree: never npm install inside the repo
+        # (npm 10 would reify jquery's package.json).
+        - mkdir -p /tmp/driver && cd /tmp/driver && npm init -y && npm install puppeteer-core@22 && cd "$TRAVIS_BUILD_DIR"
+      script:
+        - google-chrome --version
+        - php --version
+        # Multiple workers are load-bearing: a single-process php -S starves
+        # the fixture iframes the suite opens.
+        - PHP_CLI_SERVER_WORKERS=10 php -S 127.0.0.1:8000 -t . > /tmp/php.log 2>&1 &
+        - >-
+          ( for i in $(seq 1 30); do
+          if curl -sf http://127.0.0.1:8000/test/index.html > /dev/null; then exit 0; fi;
+          sleep 1;
+          done;
+          echo "PHP server did not come up"; cat /tmp/php.log; exit 1 )
+        # SEAL_SKIP_TESTS: Chrome-environment-dependent tests (not jQuery
+        # bugs), "||"-separated exact "module: test" names, each followed by
+        # " => <reason>" which the runner prints next to the totals.
+        - >-
+          CHROME_PATH="$(command -v google-chrome)"
+          NODE_PATH=/tmp/driver/node_modules
+          SEAL_SKIP_TESTS="ajax: #14379 - jQuery.ajax() on unload => environment-dependent, not a jQuery bug: the test fires a synchronous XHR from a window unload handler and modern Chrome (since ~v80) forbids sync XHR during page dismissal, so the request never reaches the server||offset: fractions (see #7730 and #7885) => environment-dependent, not a jQuery bug: asserts a fractional CSS offset round-trips exactly but Blink snaps layout positions to 1/64 px (reads back 999.984375 for 1000)"
+          node test/seal-browser-runner.js "http://127.0.0.1:8000/test/index.html?dev"
+      # Travis archives logs minutes behind the job; keep the job open until
+      # its own archived log holds the QUnit summary so the harvested log is
+      # complete (after_script cannot change the build result).
+      after_script:
+        - sh test/seal-wait-for-log.sh
