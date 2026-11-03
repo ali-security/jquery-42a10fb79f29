@@ -49,7 +49,8 @@
 					target.html( "<b></b>" ).children().replaceWith( html );
 				} ],
 				[ "jQuery.parseHTML", function( target, html ) {
-					target.append( jQuery.parseHTML( html ) );
+					// Parse into the page document: the default inert one has scripting off, so <noscript> content would parse as markup
+					target.append( jQuery.parseHTML( html, document ) );
 				} ]
 			],
 			container, reference, target, i, j;

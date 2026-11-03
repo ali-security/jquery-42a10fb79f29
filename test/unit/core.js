@@ -1389,6 +1389,60 @@ test("jQuery.parseHTML", function() {
 	ok( jQuery.parseHTML("<#if><tr><p>This is a test.</p></tr><#/if>") || true, "Garbage input should not cause error" );
 });
 
+// Support: Safari 8 (jQuery.support.createHTMLDocument === false; the protection is off there)
+if ( jQuery.support.createHTMLDocument !== false ) {
+	asyncTest( "jQuery.parseHTML - inline event handlers are not executed (sonatype-2014-0026)", function() {
+		expect( 1 );
+
+		Globals.register( "parseHTMLError" );
+
+		jQuery.globalEval( "parseHTMLError = false;" );
+		jQuery.parseHTML( "<img src=x onerror='parseHTMLError = true'>" );
+
+		window.setTimeout(function() {
+			start();
+			equal( window.parseHTMLError, false, "onerror eventhandler has not been called." );
+		}, 2000 );
+	});
+
+	asyncTest( "jQuery.parseHTML(html, keepScripts) - inline event handlers are not executed (sonatype-2014-0026)", function() {
+		expect( 1 );
+
+		Globals.register( "parseHTMLKeepScriptsError" );
+
+		jQuery.globalEval( "parseHTMLKeepScriptsError = false;" );
+		jQuery.parseHTML( "<img src=x onerror='parseHTMLKeepScriptsError = true'>", true );
+		jQuery.parseHTML( "<img src=y onerror='parseHTMLKeepScriptsError = true'>", null, true );
+
+		window.setTimeout(function() {
+			start();
+			equal( window.parseHTMLKeepScriptsError, false, "onerror eventhandler has not been called." );
+		}, 2000 );
+	});
+
+	testIframeWithCallback( "jQuery.parseHTML - inline event handlers are not executed - bundled jQuery 1.9.1 (src/sizzle/test/jquery.js) (sonatype-2014-0026)", "core/sizzleJqueryParseHTML.html", function( result ) {
+		expect( 8 );
+
+		strictEqual( result.version, "1.9.1", "src/sizzle/test/jquery.js is jQuery 1.9.1" );
+		strictEqual( result.supportCreateHTMLDocument, true, "1.9.1: jQuery.support.createHTMLDocument" );
+		deepEqual( result.executed, [], "1.9.1: context-less jQuery.parseHTML ran no inline event handler" );
+		strictEqual( result.controlFired, true, "1.9.1: the same markup parsed with an explicit document context does run it (control)" );
+		ok( /\/test\.html$/.test( result.anchorHref ), "1.9.1: href is not lost after parsing anchor (gh-2965)" );
+		strictEqual( result.insertedText, "bold", "1.9.1: parsed nodes can be inserted into the page" );
+		strictEqual( result.singleTag, "span", "1.9.1: single tags are still parsed" );
+		strictEqual( result.explicitContextOwner, true, "1.9.1: an explicit context is still used" );
+	});
+}
+
+test( "jQuery.parseHTML(<a href>) - gh-2965", function() {
+	expect( 1 );
+
+	var html = "<a href='test.html'></a>",
+		href = jQuery.parseHTML( html )[ 0 ].href;
+
+	ok( /\/test\.html$/.test( href ), "href is not lost after parsing anchor" );
+});
+
 test("jQuery.parseJSON", function() {
 	expect( 20 );
 
