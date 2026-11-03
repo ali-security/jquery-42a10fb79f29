@@ -35,6 +35,69 @@ module( "ajax", {
 		ok( true, "done" );
 	});
 
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin)", 2, {
+		create: function( options ) {
+			options.crossDomain = true;
+			return jQuery.ajax( url( "data/script.php?header=ecma" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	ajaxTest( "jQuery.ajax() - execute js for crossOrigin when dataType option is provided", 3, {
+		create: function( options ) {
+			options.crossDomain = true;
+			options.dataType = "script";
+			return jQuery.ajax( url( "data/script.php?header=ecma" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin, no header)", 2, {
+		create: function( options ) {
+			options.crossDomain = true;
+			return jQuery.ajax( url( "data/script.php" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	ajaxTest( "jQuery.ajax() - do not execute text/javascript (crossOrigin)", 2, {
+		create: function( options ) {
+			options.crossDomain = true;
+			return jQuery.ajax( url( "data/script.php?header=js" ), options );
+		},
+		success: function( data, status, xhr ) {
+			ok( /text\/javascript/.test( xhr.getResponseHeader( "Content-Type" ) ), "success (served as text/javascript)" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	testIframeWithCallback( "jQuery.ajax() - do not execute js (crossOrigin) - bundled jQuery 1.9.1 (src/sizzle/test/jquery.js)", "ajax/sizzleJqueryCrossDomain.html", function( version, executed ) {
+		expect( 6 );
+		strictEqual( version, "1.9.1", "src/sizzle/test/jquery.js is jQuery 1.9.1" );
+		strictEqual( executed.crossDomainEcma, false, "cross-domain application/ecmascript is not executed" );
+		strictEqual( executed.crossDomainJs, false, "cross-domain text/javascript is not executed" );
+		strictEqual( executed.crossDomainNoHeader, false, "cross-domain response without script header is not executed" );
+		strictEqual( executed.crossDomainDataTypeScript, true, "cross-domain js is executed when dataType is script" );
+		strictEqual( executed.sameDomain, true, "same-domain js is executed" );
+	});
+
 	ajaxTest( "jQuery.ajax() - success callbacks", 8, {
 		setup: addGlobalEvents("ajaxStart ajaxStop ajaxSend ajaxComplete ajaxSuccess"),
 		url: url("data/name.html"),
