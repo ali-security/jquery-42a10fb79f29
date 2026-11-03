@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Bundled jQuery 1.9.1 (src/sizzle/test/jquery.js): XHTML-style self-closing tags aren't expanded (CVE-2020-11022)</title>
+	<script src="../../../src/sizzle/test/jquery.js"></script>
+</head>
+<body>
+	<script>
+		// Each string is safe as-is: the <img> only exists as text inside a
+		// raw text/RCDATA element or an attribute value. Expanding a
+		// self-closing tag ( <tag/> -> <tag></tag> ) used to let it out.
+		// Payload i calls xss( i ).
+		// Thanks to Masato Kinugawa from Cure53 for the original test cases.
+		var payloads = [
+				"<img alt=\"<x\" title=\"/><img src=url404 onerror=xss(0)>\">",
+				"<img alt=\"\n<x\" title=\"/>\n<img src=url404 onerror=xss(1)>\">",
+				"<style><style/><img src=url404 onerror=xss(2)>",
+				"<xmp><xmp/><img src=url404 onerror=xss(3)>",
+				"<title><title /><img src=url404 onerror=xss(4)>",
+				"<iframe><iframe/><img src=url404 onerror=xss(5)>",
+				"<noframes><noframes/><img src=url404 onerror=xss(6)>",
+				"<noscript><noscript/><img src=url404 onerror=xss(7)>",
+				"<foo\" alt=\"\" title=\"/><img src=url404 onerror=xss(8)>\">",
+				"<img alt=\"<x\" title=\"\" src=\"/><img src=url404 onerror=xss(9)>\">",
+				"<noscript/><img src=url404 onerror=xss(10)>",
+				"<template><style></template><img src=url404 onerror=xss(11)>",
+				"<noembed><noembed/><img src=url404 onerror=xss(12)>",
+				"<textarea><textarea/><img src=url404 onerror=xss(13)>"
+			],
+			result = {
+				version: jQuery.fn.jquery,
+				htmlPrefilterType: typeof jQuery.htmlPrefilter,
+				payloads: payloads,
+				mismatches: [],
+				executed: []
+			},
+			methods = [
+				[ "jQuery", function( target, html ) {
+					target.append( jQuery( html ) );
+				} ],
+				[ "html", function( target, html ) {
+					target.html( html );
+				} ],
+				[ "append", function( target, html ) {
+					target.append( html );
+				} ],
+				[ "replaceWith", function( target, html ) {
+					target.html( "<b></b>" ).children().replaceWith( html );
+				} ],
+				[ "jQuery.parseHTML", function( target, html ) {
+					target.append( jQuery.parseHTML( html ) );
+				} ]
+			],
+			container, reference, target, i, j;
+
+		window.xss = function( index ) {
+			result.executed.push( payloads[ index ] );
+		};
+
+		if ( result.htmlPrefilterType === "function" ) {
+			result.prefiltered = jQuery.htmlPrefilter( "<div/><span/><style/>" );
+		}
+
+		// "<div/>" is just a start tag to the HTML parser, so the second <div>
+		// ends up inside the first one instead of next to it
+		result.topLevel = jQuery( "<div/><div/>" ).length;
+		result.htmlChildren = jQuery( "<div></div>" ).html( "<div/><div/>" ).children().length;
+		result.appendChildren = jQuery( "<div></div>" ).append( "<div/><div/>" ).children().length;
+
+		container = jQuery( "<div></div>" ).appendTo( document.body );
+
+		for ( i = 0; i < payloads.length; i++ ) {
+
+			// What a sanitizer (or the browser itself) gets when parsing
+			// the same string inside a generic container
+			reference = document.createElement( "div" );
+			reference.innerHTML = payloads[ i ];
+
+			for ( j = 0; j < methods.length; j++ ) {
+				target = jQuery( "<div></div>" ).appendTo( container );
+				methods[ j ][ 1 ]( target, payloads[ i ] );
+				if ( target[ 0 ].innerHTML !== reference.innerHTML ) {
+					result.mismatches.push( methods[ j ][ 0 ] + "( " + payloads[ i ] + " )" );
+				}
+			}
+		}
+
+		result.handlerImages = container.find( "img[onerror]" ).length;
+
+		// Give the url404 images time to fail and fire any injected onerror handler
+		setTimeout(function() {
+			window.parent.iframeCallback( result );
+		}, 1000 );
+	</script>
+</body>
+</html>
